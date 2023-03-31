@@ -4,10 +4,10 @@ class Vector:
        self._coords = a[:]
        self._n = len(a)
     def __add__(self, other):
-        result = [0 for i in range(self.n)]
+        result = [0 for i in range(self._n)]
         for i in range(self._n):
             result[i] = self._coords[i] + other._coords[i]
-        return result
+        return Vector(result)
     def dot(self, other):
         result = 0
         for i in range(self._n):
@@ -15,7 +15,7 @@ class Vector:
         return result
 
     def scale(self, alpha):
-        result = []
+        result = [0 for i in range(self._n)]
         for i in range(self._n):
             result[i] = alpha * self._coords[i]
         return Vector(result)

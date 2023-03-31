@@ -2,7 +2,7 @@ from vector import Vector
 
 class Sketch:
     def __init__(self, text, k, d):
-        freq = []
+        freq = [0 for i in range(d)]
         for i in range(len(text) - k):
             kgram = text[i:i+k]
             freq[hash(kgram) % d] += 1
