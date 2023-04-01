@@ -1,5 +1,9 @@
 import requests
+import time
 import csv
+import os
+import subprocess
+import sys
 from bs4 import BeautifulSoup
 from sketch import Sketch
 
@@ -35,23 +39,20 @@ class RBCNewsGrabber:
         self.newspage_link = link
 
     def grab_news(self, n):
-        try:
-            response = requests.get(self.newspage_link, timeout=4)
-            status = response.status_code
-            if status == 404:
-                raise InvalidUrlExcepion
-            page = response.text
-            soup = BeautifulSoup(page,  'xml')
-            self.news_list = []
-            for item in soup.find_all('item', limit=n):
-                title= item.find('title').text
-                description = item.find('description').text
-                full_text = item.find('rbc_news:full-text').text
-                link = item.find('link').text
-                news = News(title, description, full_text, link)
-                self.news_list.append(news)
-        except Exception as e:
-            print(e)
+        response = requests.get(self.newspage_link, timeout=4)
+        status = response.status_code
+        if status == 404:
+            raise InvalidUrlException
+        page = response.text
+        soup = BeautifulSoup(page,  'xml')
+        self.news_list = []
+        for item in soup.find_all('item', limit=n):
+            title= item.find('title').text
+            description = item.find('description').text
+            full_text = item.find('rbc_news:full-text').text
+            link = item.find('link').text
+            news = News(title, description, full_text, link)
+            self.news_list.append(news)
     def check_internet_connection():
         pass
 
@@ -62,29 +63,29 @@ class JokesGrabber:
     def cache_jokes(self):
         i = 0
         page = 2
-        try:
-            with open('jokes.csv', 'w', newline='') as f:
-                writer = csv.writer(f)
-                while i < 1000:
-                    link = f"https://www.anekdot.ru/tags/%D0%BE%20%D0%B6%D0%B8%D0%B7%D0%BD%D0%B8/{page}?type=anekdots"
-                    response = requests.get(link, timeout=4)
-                    status = response.status_code
-                    if status == 404:
-                        raise InvalidUrlExcepion
-                    html = response.text
-                    soup = BeautifulSoup(html,  'html.parser')
-                    for item in soup.findAll("div", class_="text"):
-                        i+=1
+        with open('jokes.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            while i < 1000:
+                link = f"https://www.anekdot.ru/tags/%D0%BE%20%D0%B6%D0%B8%D0%B7%D0%BD%D0%B8/{page}?type=anekdots"
+                response = requests.get(link, timeout=4)
+                status = response.status_code
+                if status == 404:
+                    raise InvalidUrlException
+                html = response.text
+                soup = BeautifulSoup(html,  'html.parser')
+                for item in soup.findAll("div", class_="text"):
+                    i+=1
+                    writer.writerow([item.text])
+                page += 1
 
-                        writer.writerow([item.text])
-                    page += 1
-        except Exception as e:
-             print(e)
     def get_jokes(self, n):
         jokes_list = []
-        with open('jokes.csv', newline='') as f:
+        with open('jokes.csv',  newline='') as f:
             reader = csv.reader(f)
             rows = list(reader)
+            print(len(rows))
+            if len(rows) < n:
+                raise MissingJokesFileException
             for i in range(n):
                 joke = Joke(rows[i][0])
                 jokes_list.append(joke)
@@ -125,13 +126,43 @@ class TrollFactory:
 class InternetConnectionException(Exception):
     pass
 
+
 class PageParcingException(Exception):
     pass
 
-class InvalidUrlExcepion(Exception):
+
+class InvalidUrlException(Exception):
     pass
+
+
+class MissingJokesFileException(Exception):
+        pass
+
 
 if __name__ == "__main__":
     jokes_grabber = JokesGrabber()
-    factory = TrollFactory(jokes_grabber.get_jokes(1000))
-    factory.save()
+    try:
+        factory = TrollFactory(jokes_grabber.get_jokes(1000))
+        factory.save()
+    except MissingJokesFileException:
+        jokes_grabber.cache_jokes()
+        factory = TrollFactory(jokes_grabber.get_jokes(1000))
+    except InvalidUrlException:
+        print("ERROR: INVALID URL")
+    except requests.ConnectionError:
+        print('lol')
+        connection = False
+        i = 0
+        while not connection:
+            time.sleep(2)
+            print('\r' + 'No Internet connection Trying to reconnect'+ ('.' *
+            (i+1)) + " " * (2 - i),
+            end="")
+            ping = subprocess.run(['ping', '-c', '1', 'yandex.ru'],
+            capture_output=True)
+            if ping.returncode == 0:
+                connection = True
+                print('\n')
+            i = (i + 1) % 3
+    except Exception as e:
+        print(type(e).__name__)
